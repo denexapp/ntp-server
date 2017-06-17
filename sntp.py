@@ -154,7 +154,7 @@ def run_server():
     print("SNTP server started.")
     print("Port: {}".format(port))
     print("Delay: {}".format(delay))
-    with socket_file.socket(socket_file.SOCK_DGRAM) as socket:
+    with socket_file.socket(socket_file.AF_INET, socket_file.SOCK_DGRAM) as socket:
         try:
             socket.bind(('', port))
             socket.listen(1024)
