@@ -1,1 +1,1 @@
-worker: python sntp.py
+worker: python sntp.py -p 54321 -d 100
