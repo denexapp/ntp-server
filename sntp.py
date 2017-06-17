@@ -11,10 +11,10 @@ class Packet:
     version = 4
     mode = 4
     stratum = 10
-    reference_timestamp = None
-    originate_timestamp = None
-    recieve_timestamp = None
-    transmit_timestamp = None
+    reference_timestamp = 0
+    originate_timestamp = 0
+    recieve_timestamp = 0
+    transmit_timestamp = 0
 
     def __init__(self, bytes=None):
         if bytes:
@@ -59,10 +59,7 @@ class Packet:
 
 
 def convert_to_string_of_bits(number, length):
-    line = bitstring.BitArray(number).bin()
-    if len(line) > length:
-        raise Exception
-    line = "0" * (length - len(line)) + line
+    line = bitstring.BitArray(uint=number, length=length).bin
     return line
 
 
@@ -87,12 +84,8 @@ def decode_timestamp(timestamp):
     for x in range(32):
         if timestamp[x+32]:
             result += 1 / 2 ** (x+1)
-    result -= 25567 * 24 * 60 * 60
-    return time.gmtime(result)
-
-    #
-    # delay = (destination_timestamp - originate_timestamp) - (recieve_timestamp - transmit_timestamp)
-    # offset = ((recieve_timestamp - originate_timestamp) + (transmit_timestamp - destination_timestamp)) / 2
+    result %= 25567 * 24 * 60 * 60
+    return result
 
 
 def parse_args():
@@ -131,22 +124,16 @@ def generate_reply(transmit_timestamp, delay=0):
     reply = Packet()
     # this line has no errors
     reply.originate_timestamp = transmit_timestamp
-    server_time = time.gmtime(time.time() + delay)
+    server_time = time.time() + delay
     reply.recieve_timestamp = server_time
     reply.transmit_timestamp = server_time
     return reply
 
 
-def send_data(bytes, connection):
-    connection.send(bytes)
-
-
-def handle_connection(connection, delay=0):
-    data = accept_data(connection)
+def handle_connection(address, data, socket, delay=0):
     request = Packet(data)
     reply = generate_reply(request.transmit_timestamp, delay=delay)
-    send_data(reply.to_bytes(), connection)
-    connection.close()
+    socket.sendto(reply.to_bytes(), address)
 
 
 def run_server():
@@ -156,16 +143,14 @@ def run_server():
     print("Delay: {}".format(delay))
     with socket_file.socket(socket_file.AF_INET, socket_file.SOCK_DGRAM) as socket:
         try:
-            socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            socket.bind(('', port))
-            socket.listen(1024)
+            socket.bind(('127.0.0.1', port))
         except OSError:
-            print("Can't listen UDP port {}.".format(port))
+            print("Can't bind to UDP port {}.".format(port))
             return
         while True:
-            connection, address = socket.accept()
+            data, address = socket.recvfrom(65535)
             print("New connection from {}".format(address))
-            Thread(handle_connection(connection, delay))
+            Thread(handle_connection(address, data, socket, delay))
 
 
 if __name__ == '__main__':
